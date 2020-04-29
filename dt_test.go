@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/disiqueira/gotree"
+	"github.com/timdrysdale/gradexpath"
 )
 
 func TestTree(t *testing.T) {
@@ -39,38 +40,64 @@ type Node struct {
 	Tree      gotree.Tree
 	FileCount int
 	PageCount int
+	Name      string
 }
 
 func TestWlkTree(t *testing.T) {
 
 	treemap := make(map[string]gotree.Tree)
-	treemap["."] = gotree.New("Exam123")
+	treemap["."] = gotree.New("Practice Exam")
 
-	err := filepath.Walk("/home/tim/tg/ingester/", func(path string, info os.FileInfo, err error) error {
+	err := filepath.Walk("/home/tim/tg/ingester/tmp-delete-me/usr/exam/Practice Exam Drop Box/", func(path string, info os.FileInfo, err error) error {
+
 		if err != nil {
-			fmt.Printf("prevent panic by handling failure accessing a path %q: %v\n", path, err)
+			fmt.Println(err)
 			return err
+		}
+		if info.IsDir() && strings.Contains(info.Name(), "temp") {
+			return filepath.SkipDir
 		}
 		if info.IsDir() {
 
-			parent := strings.TrimSuffix(path, filepath.Base(path))
+			filelist, _ := gradexpath.GetFileList(path)
+			numPdf := 0
+
+			for _, file := range filelist {
+				if gradexpath.IsPdf(file) {
+					numPdf++
+				}
+				if gradexpath.IsTxt(file) {
+					numPdf++
+				}
+			}
+
+			label := fmt.Sprintf("%3d %s", numPdf, filepath.Base(path))
+			if numPdf == 0 {
+				label = fmt.Sprintf("  · %s", filepath.Base(path)) //U+00B7
+			}
+
+			parent := filepath.Dir(path)
+
 			if parent != "" {
-				//fmt.Printf("%s->%s\n", parent, path)
+
 				if _, ok := treemap[parent]; !ok {
-					treemap[parent] = (treemap["."]).Add(filepath.Base(path))
+
+					fmt.Println(parent)
+					fmt.Println(path)
+
+					treemap[parent] = (treemap["."]).Add(label)
+
 				} else {
 					//foo := (treemap[parent]).Add(path)
-					treemap[path] = (treemap[parent]).Add(filepath.Base(path))
+					treemap[path] = (treemap[parent]).Add(fmt.Sprintf(label))
 				}
 			} else {
+
 				treemap[path] = (treemap["."]).Add(path)
 			}
 
 		}
 
-		//if info.IsDir() { // && info.Name() != DirToWalk {
-		//	return filepath.SkipDir
-		//}
 		//fmt.Printf("visited file or dir: %q\n", path)
 		return nil
 	})
