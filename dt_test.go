@@ -9,6 +9,7 @@ import (
 
 	"github.com/disiqueira/gotree"
 	"github.com/timdrysdale/gradexpath"
+	pdf "github.com/timdrysdale/unipdf/v3/model"
 )
 
 func TestTree(t *testing.T) {
@@ -61,19 +62,24 @@ func TestWlkTree(t *testing.T) {
 
 			filelist, _ := gradexpath.GetFileList(path)
 			numPdf := 0
+			pageCount := 0
 
 			for _, file := range filelist {
 				if gradexpath.IsPdf(file) {
 					numPdf++
+					pc, err := CountPages(file)
+					if err == nil {
+						pageCount = pageCount + pc
+					}
 				}
 				if gradexpath.IsTxt(file) {
 					numPdf++
 				}
 			}
 
-			label := fmt.Sprintf("%3d %s", numPdf, filepath.Base(path))
+			label := fmt.Sprintf("%3d %4d %s", numPdf, pageCount, filepath.Base(path))
 			if numPdf == 0 {
-				label = fmt.Sprintf("  · %s", filepath.Base(path)) //U+00B7
+				label = fmt.Sprintf("  ·   · %s", filepath.Base(path)) //U+00B7
 			}
 
 			parent := filepath.Dir(path)
@@ -106,4 +112,41 @@ func TestWlkTree(t *testing.T) {
 	}
 
 	fmt.Println(treemap["."].Print())
+}
+
+func CountPages(inputPath string) (int, error) {
+
+	numPages := 0
+
+	f, err := os.Open(inputPath)
+	if err != nil {
+		return numPages, err
+	}
+
+	pdfReader, err := pdf.NewPdfReader(f)
+	if err != nil {
+		return numPages, err
+	}
+
+	defer f.Close()
+
+	isEncrypted, err := pdfReader.IsEncrypted()
+	if err != nil {
+		return numPages, err
+	}
+
+	if isEncrypted {
+		_, err = pdfReader.Decrypt([]byte(""))
+		if err != nil {
+			return numPages, err
+		}
+	}
+
+	numPages, err = pdfReader.GetNumPages()
+	if err != nil {
+		return numPages, err
+	}
+
+	return numPages, nil
+
 }
